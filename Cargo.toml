@@ -1,0 +1,30 @@
+[package]
+name = "mxmaster"
+version = "0.1.0"
+edition = "2021"
+description = "Minimal Logitech MX Master 3S gesture-button daemon for macOS (HID++ over Bluetooth LE and Logi Bolt)"
+license = "MIT"
+repository = "https://github.com/danew/mxmaster"
+readme = "README.md"
+keywords = ["logitech", "mx-master", "hidpp", "macos", "mouse"]
+categories = ["hardware-support", "os::macos-apis"]
+publish = false
+
+[dependencies]
+core-foundation-sys = "0.8"
+
+[[bin]]
+name = "mxmasterd"
+path = "src/main.rs"
+
+[[bin]]
+name = "mxprobe"
+path = "src/bin/mxprobe.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+# Cargo's own strip step (rust-objcopy) crashed on this toolchain; symbols are kept.
+strip = false

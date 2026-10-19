@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>io.github.danew.mxmaster</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@APP@/Contents/MacOS/mxmasterd</string>
+	</array>
+	<!-- Only in the logged-in GUI session; the daemon needs the window server. -->
+	<key>LimitLoadToSessionType</key>
+	<string>Aqua</string>
+	<key>RunAtLoad</key>
+	<true/>
+	<!-- Restart after a crash, but not after a clean stop (launchctl bootout). -->
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>ThrottleInterval</key>
+	<integer>10</integer>
+	<!-- Not "Background": avoids timer coalescing/throttling that adds gesture latency. -->
+	<key>ProcessType</key>
+	<string>Interactive</string>
+	<key>StandardErrorPath</key>
+	<string>@LOG@</string>
+	<key>StandardOutPath</key>
+	<string>@LOG@</string>
+</dict>
+</plist>

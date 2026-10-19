@@ -1,0 +1,7 @@
+/target/
+.DS_Store
+
+# Never commit signing material (scripts/make-signing-identity.sh keeps it in the keychain).
+*.p12
+*.pem
+*.cer

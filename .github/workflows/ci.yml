@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+      - name: Format
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --all-targets --release -- -D warnings
+      - name: Test
+        run: cargo test --release
+      - name: Build app bundle
+        run: |
+          cargo build --release --bin mxmasterd --bin mxprobe
+          plutil -lint packaging/Info.plist packaging/io.github.danew.mxmaster.plist
