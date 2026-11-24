@@ -6,9 +6,9 @@ Logitech software. It runs as your user from a LaunchAgent.
 
 ## What it does
 
-Only the gesture (thumb) button is touched. It is diverted to the daemon over
-HID++ with raw XY coordinates, using the *temporary* bits only, so the mouse
-behaves stock again on its next reconnect if the daemon is not running.
+The gesture (thumb) button is diverted to the daemon over HID++ with raw XY
+coordinates, using the *temporary* bits only. The button returns to stock
+behavior on its next reconnect if the daemon is not running.
 
 | Gesture button | Action |
 |---|---|
@@ -17,9 +17,9 @@ behaves stock again on its next reconnect if the daemon is not running.
 | Hold + down | App Exposé |
 | Hold + left / right | Switch to the Space on the left / right |
 
-Everything else stays native and untouched: pointer, clicks, both wheels,
-back/forward (buttons 4/5), and the SmartShift button, which toggles
-ratchet/free-spin in the mouse firmware.
+The horizontal thumb wheel stays native and can optionally be reversed.
+The pointer, clicks, vertical wheel, back/forward (buttons 4/5), and SmartShift
+button are untouched.
 
 The mapping is hardcoded in `src/actions.rs` (`action_for`).
 
@@ -58,6 +58,20 @@ press, release and rawXY report.
 **Logi Options+ must not run at the same time.** It diverts the same controls.
 Uninstall it, or stop it until the next login with
 `launchctl bootout gui/$(id -u)/com.logi.cp-dev-mgr`.
+
+### Reverse horizontal scrolling
+
+With the updated daemon installed, run:
+
+```sh
+defaults write io.github.danew.mxmaster InvertThumbWheel -bool true
+launchctl kickstart -k gui/$(id -u)/io.github.danew.mxmaster
+```
+
+This reverses only the mouse's side wheel, without changing macOS's Natural
+Scrolling setting. The daemon reapplies the preference on reconnect and wake.
+Use `-bool false` and restart to restore the mouse's default direction. If the
+preference is unset, the daemon leaves the wheel's current direction alone.
 
 ### Keeping permissions across rebuilds
 

@@ -117,8 +117,18 @@ auto-shift threshold lives in the mouse; read-only use in the probe:
 
 ### 3.6 Wheels — `0x2121` HiRes wheel, `0x2150` thumb wheel
 
-Not written. Reading `0x2121` fn1 (wheel mode) and `0x2150` fn1 (status) in the
-probe confirms the wheels are in native (non-diverted) mode.
+The vertical wheel is not written. The optional `InvertThumbWheel` preference
+uses `0x2150` only:
+
+| Function | Request | Response |
+|---|---|---|
+| 1 getStatus | — | `diverted flags` (bit 0 of `flags` is inversion) |
+| 2 setReporting | `diverted invert` | updated reporting status |
+
+The daemon preserves the current diversion mode and writes only when the
+inversion bit differs. Touch/proximity flags in the status are not sent back as
+part of the `invert` parameter. See [Logiops' ThumbWheel implementation](https://github.com/PixlOne/logiops/blob/main/src/logid/backend/hidpp20/features/ThumbWheel.cpp)
+for the reporting layout.
 
 ### 3.7 Reconnection signalling
 

@@ -1,11 +1,12 @@
 //! mxmasterd — gesture button support for the MX Master 3S without Options+.
 //!
 //! Only the gesture button (CID 0x00C3) is diverted, temporarily, with rawXY.
-//! Pointer, clicks, wheels, back/forward and the SmartShift button stay
-//! native. Diversion is volatile on the mouse, so it is re-applied after every
+//! The native thumb wheel can optionally be inverted. Other controls stay
+//! untouched. Diversion is volatile on the mouse, so it is re-applied after every
 //! reconnect: new IOHIDDevice (BLE), WirelessDeviceStatus 0x1D4B, Bolt
 //! receiver connection notification 0x41, and system wake.
 
+use core_foundation_sys::preferences::CFPreferencesGetAppBooleanValue;
 use mxmaster::actions::{self, Busy, GestureTracker};
 use mxmaster::ffi::*;
 use mxmaster::hid::{self, Device, Hotplug, Manager, SendMethod};
@@ -82,6 +83,7 @@ fn main() {
         std::env::var_os("MXMASTER_DEBUG").is_some(),
         Ordering::Relaxed,
     );
+    let invert_thumb_wheel = thumb_wheel_preference();
     install_signal_handlers();
     install_power_notifications();
 
@@ -154,7 +156,7 @@ fn main() {
         }
 
         if s.config.is_none() && Instant::now() >= s.next_attempt {
-            configure(s);
+            configure(s, invert_thumb_wheel);
         }
 
         for m in s.link.poll() {
@@ -225,7 +227,16 @@ fn adopt(raw: IOHIDDeviceRef) -> Option<Session> {
     })
 }
 
-fn configure(s: &mut Session) {
+fn thumb_wheel_preference() -> Option<bool> {
+    let domain = cf::string("io.github.danew.mxmaster");
+    let key = cf::string("InvertThumbWheel");
+    let mut valid = 0;
+    let value =
+        unsafe { CFPreferencesGetAppBooleanValue(key.0.cast(), domain.0.cast(), &mut valid) };
+    (valid != 0).then_some(value != 0)
+}
+
+fn configure(s: &mut Session, invert_thumb_wheel: Option<bool>) {
     if s.bolt {
         if let Err(e) = prepare_receiver(s) {
             return s.fail(&e);
@@ -271,6 +282,38 @@ fn configure(s: &mut Session) {
         rawxy,
     });
     s.backoff = BACKOFF_MIN;
+
+    if let Some(inverted) = invert_thumb_wheel {
+        match set_thumb_wheel_direction(link, inverted) {
+            Ok(()) => log!("thumb wheel inverted: {inverted}"),
+            Err(e) => log!("could not set thumb wheel direction: {e}"),
+        }
+    }
+}
+
+fn set_thumb_wheel_direction(link: &mut Link, inverted: bool) -> Result<(), String> {
+    let feature = link
+        .feature_index(hidpp::FEAT_THUMB_WHEEL)
+        .map_err(|e| e.to_string())?
+        .ok_or("device has no THUMB_WHEEL feature")?;
+    let timeout = Duration::from_millis(500);
+    let status = link
+        .request(feature, 1, &[], timeout)
+        .map_err(|e| e.to_string())?;
+    let [diverted, flags, ..] = status.as_slice() else {
+        return Err("short THUMB_WHEEL status response".into());
+    };
+    if let Some(reporting) = thumb_wheel_reporting(*diverted, *flags, inverted) {
+        link.request(feature, 2, &reporting, timeout)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+fn thumb_wheel_reporting(diverted: u8, flags: u8, inverted: bool) -> Option<[u8; 2]> {
+    // GET reports touch/proximity in bits 1/2; SET takes just the inversion bit.
+    let direction = u8::from(inverted);
+    (flags & 1 != direction).then_some([diverted, direction])
 }
 
 /// Bolt: pick the send method, enable connection notifications, and find the
@@ -441,5 +484,26 @@ fn install_power_notifications() {
             IONotificationPortGetRunLoopSource(port),
             core_foundation_sys::runloop::kCFRunLoopDefaultMode,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::thumb_wheel_reporting;
+
+    #[test]
+    fn inverts_native_thumb_wheel_without_setting_status_bits() {
+        assert_eq!(thumb_wheel_reporting(0, 0b110, true), Some([0, 1]));
+    }
+
+    #[test]
+    fn clears_inversion_without_changing_diversion() {
+        assert_eq!(thumb_wheel_reporting(1, 0b111, false), Some([1, 0]));
+    }
+
+    #[test]
+    fn skips_write_when_direction_already_matches() {
+        assert_eq!(thumb_wheel_reporting(0, 0b110, false), None);
+        assert_eq!(thumb_wheel_reporting(0, 0b111, true), None);
     }
 }
